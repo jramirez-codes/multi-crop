@@ -3,12 +3,55 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Multi-Crop</title>
+  <title>Multi-Crop — Crop Multiple Regions From One Image Online for Free</title>
+  <meta name="description" content="The easiest way to crop multiple regions from a single image. Draw named crop areas, auto-remove backgrounds, and export each crop as a PNG — free, no upload, runs entirely in your browser.">
+  <meta name="keywords" content="multi crop, crop multiple regions, batch image crop, multiple crop tool, image cropper online, crop several areas, bulk crop image, free image cropper, background removal, browser image editor">
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="Multi-Crop — Crop Multiple Regions From One Image">
+  <meta property="og:description" content="Draw multiple named crop regions on a single image and export them all as PNGs. Free, private, and runs entirely in your browser.">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="example.png">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Multi-Crop — Crop Multiple Regions From One Image">
+  <meta name="twitter:description" content="The easiest online tool to crop multiple areas from one image. No signup, no upload — works right in your browser.">
+  <meta name="twitter:image" content="example.png">
+
+  <link rel="canonical" href="">
   <link rel="stylesheet" href="style.css">
+
+  <!-- Structured Data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "Multi-Crop",
+    "headline": "Crop Multiple Regions From One Image Online for Free",
+    "description": "The easiest way to crop multiple regions from a single image. Draw named crop areas, auto-remove backgrounds, and export each crop as a PNG. Free, no upload required — runs entirely in your browser.",
+    "applicationCategory": "MultimediaApplication",
+    "operatingSystem": "Any",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    },
+    "featureList": [
+      "Crop multiple regions from one image",
+      "Name each crop region for organized exports",
+      "Automatic background removal",
+      "Pan and zoom controls",
+      "Drag and drop or paste images from clipboard",
+      "Export all crops as individual PNG files",
+      "No server upload — images stay in your browser"
+    ]
+  }
+  </script>
 </head>
 <body>
   <div id="app">
-    <div id="toolbar">
+    <header id="toolbar" role="toolbar" aria-label="Image editing tools">
       <label id="upload-btn" class="btn">
         <input type="file" id="file-input" accept="image/*" hidden>
         Upload Image
@@ -34,14 +77,16 @@
         <span>Remove BG</span>
       </label>
       <button class="btn primary" id="save-btn" title="Export crops (Ctrl+S)">Export Crops</button>
-    </div>
+    </header>
 
-    <div id="main">
+    <h1 class="sr-only">Multi-Crop — Crop Multiple Regions From One Image Online</h1>
+
+    <main id="main">
       <div id="canvas-container">
         <div id="drop-zone" class="visible">
           <div id="drop-zone-content">
             <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="1.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-            <p>Drop an image here or click Upload</p>
+            <p>Drop an image here, paste from clipboard, or click Upload</p>
           </div>
         </div>
         <canvas id="canvas"></canvas>
@@ -57,7 +102,28 @@
           <p>Draw rectangles on the image to create crop regions</p>
         </div>
       </div>
-    </div>
+    </main>
+
+    <section class="sr-only" aria-label="About Multi-Crop">
+      <h2>The Easiest Way to Crop Multiple Regions From One Image</h2>
+      <p>Multi-Crop is a free online image cropping tool that lets you select and export multiple crop regions from a single image. Unlike traditional croppers that only handle one area at a time, Multi-Crop lets you draw as many rectangular selections as you need, name each one, and download them all as individual PNG files with one click.</p>
+      <h3>How It Works</h3>
+      <ol>
+        <li>Upload, drag and drop, or paste an image from your clipboard.</li>
+        <li>Draw rectangles on the image to define crop regions.</li>
+        <li>Name each region in the sidebar for organized file exports.</li>
+        <li>Toggle automatic background removal to get clean cutouts.</li>
+        <li>Click Export Crops to download every region as a separate PNG.</li>
+      </ol>
+      <h3>Key Features</h3>
+      <ul>
+        <li>Crop multiple areas from one image at once — no repeated uploads.</li>
+        <li>Automatic background detection and removal using edge-pixel analysis.</li>
+        <li>Pan and zoom for precise selections on large images.</li>
+        <li>Runs 100% in your browser — your images are never uploaded to a server.</li>
+        <li>No signup, no watermarks, completely free.</li>
+      </ul>
+    </section>
   </div>
 
   <script type="module" src="js/app.js"></script>

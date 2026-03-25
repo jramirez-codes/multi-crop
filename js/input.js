@@ -54,6 +54,19 @@ export function initInput() {
     if (file && file.type.startsWith('image/')) loadImage(file);
   });
 
+  // Clipboard paste
+  window.addEventListener('paste', (e) => {
+    const items = e.clipboardData && e.clipboardData.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        e.preventDefault();
+        loadImage(item.getAsFile());
+        return;
+      }
+    }
+  });
+
   // ---- Tool switching ----
 
   toolBtns.forEach((btn) => {
