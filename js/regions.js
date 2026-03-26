@@ -1,29 +1,41 @@
 import { COLORS } from './config.js';
 import { state } from './state.js';
 
-export function getHandles(r, hs) {
-  return [
-    { x: r.x, y: r.y, cursor: 'nwse-resize', edge: 'tl' },
-    { x: r.x + r.w, y: r.y, cursor: 'nesw-resize', edge: 'tr' },
-    { x: r.x, y: r.y + r.h, cursor: 'nesw-resize', edge: 'bl' },
-    { x: r.x + r.w, y: r.y + r.h, cursor: 'nwse-resize', edge: 'br' },
-    { x: r.x + r.w / 2, y: r.y, cursor: 'ns-resize', edge: 't' },
-    { x: r.x + r.w / 2, y: r.y + r.h, cursor: 'ns-resize', edge: 'b' },
-    { x: r.x, y: r.y + r.h / 2, cursor: 'ew-resize', edge: 'l' },
-    { x: r.x + r.w, y: r.y + r.h / 2, cursor: 'ew-resize', edge: 'r' },
-  ];
-}
-
 export function createRegion(rect) {
+  // Find which image this region covers the most
+  let bestImg = state.img;
+  let maxArea = 0;
+  
+  state.images.forEach(imgData => {
+    // Check if the center of the rect is within this image's bounds
+    const cx = rect.x + rect.w / 2;
+    const cy = rect.y + rect.h / 2;
+    if (cx >= imgData.x && cx <= imgData.x + imgData.w && cy >= imgData.y && cy <= imgData.y + imgData.h) {
+      bestImg = imgData.img;
+      maxArea = 1; // Mark as found
+      return;
+    }
+    
+    const overlapX = Math.max(0, Math.min(rect.x + rect.w, imgData.x + imgData.w) - Math.max(rect.x, imgData.x));
+    const overlapY = Math.max(0, Math.min(rect.y + rect.h, imgData.y + imgData.h) - Math.max(rect.y, imgData.y));
+    const area = overlapX * overlapY;
+    if (area > maxArea) {
+      maxArea = area;
+      bestImg = imgData.img;
+    }
+  });
+
   const color = COLORS[(state.nextId - 1) % COLORS.length];
   const region = {
     id: state.nextId++,
-    name: '',
     x: rect.x,
     y: rect.y,
     w: rect.w,
     h: rect.h,
     color,
+    img: bestImg,
+    flipH: false,
+    flipV: false,
   };
   state.regions.push(region);
   state.activeRegionId = region.id;
@@ -45,15 +57,9 @@ export function findRegionAt(pt) {
   return null;
 }
 
-export function findHandleAt(pt) {
-  const active = state.regions.find((r) => r.id === state.activeRegionId);
-  if (!active) return null;
-  const hs = 8 / state.scale;
-  const handles = getHandles(active, hs);
-  for (const h of handles) {
-    if (Math.abs(pt.x - h.x) < hs && Math.abs(pt.y - h.y) < hs) {
-      return { region: active, handle: h };
-    }
-  }
-  return null;
+export function reorderRegion(id, newIndex) {
+  const idx = state.regions.findIndex((r) => r.id === id);
+  if (idx === -1 || newIndex < 0 || newIndex >= state.regions.length) return;
+  const [region] = state.regions.splice(idx, 1);
+  state.regions.splice(newIndex, 0, region);
 }

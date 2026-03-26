@@ -1,9 +1,9 @@
 import { MIN_REGION_SIZE } from './config.js';
 import { state } from './state.js';
-import { getCanvas, getContainer, screenToImage, fitToView, zoomBy, draw, getDragRect } from './canvas.js';
-import { getHandles, createRegion, deleteRegion, findRegionAt, findHandleAt } from './regions.js';
+import { getCanvas, getContainer, screenToImage, fitToView, zoomBy, draw, getDragRect, getResizeHandles } from './canvas.js';
+import { createRegion, deleteRegion, findRegionAt } from './regions.js';
 import { renderSidebar } from './sidebar.js';
-import { exportCrops } from './export.js';
+import { exportGrid } from './export.js';
 
 export function initInput() {
   const canvas = getCanvas();
@@ -20,9 +20,24 @@ export function initInput() {
     reader.onload = (e) => {
       const newImg = new Image();
       newImg.onload = () => {
-        state.img = newImg;
-        state.regions = [];
-        state.nextId = 1;
+        const spacing = 40;
+        let nextX = 0;
+        if (state.images.length > 0) {
+          const lastImg = state.images[state.images.length - 1];
+          nextX = lastImg.x + lastImg.w + spacing;
+        }
+
+        const imgData = {
+          img: newImg,
+          x: nextX,
+          y: 0,
+          w: newImg.width,
+          h: newImg.height,
+        };
+
+        state.images.push(imgData);
+        state.img = newImg; // Current image for stamping context
+
         state.activeRegionId = null;
         fitToView();
         dropZone.classList.remove('visible');
@@ -82,6 +97,7 @@ export function initInput() {
   removeBgToggle.checked = state.removeBg;
   removeBgToggle.addEventListener('change', () => {
     state.removeBg = removeBgToggle.checked;
+    renderSidebar();
   });
 
   // ---- Zoom ----
@@ -116,35 +132,51 @@ export function initInput() {
 
     if (state.tool !== 'select' || e.button !== 0) return;
 
-    // Check resize handles on active region
-    const handleHit = findHandleAt(pt);
-    if (handleHit) {
-      state.resizing = {
-        id: handleHit.region.id,
-        handle: handleHit.handle.edge,
-        startRect: { ...handleHit.region },
-        startPt: pt,
-      };
-      state.dragging = true;
-      return;
-    }
+    // If crop size is set, check if clicking on a resize handle or existing region
+    if (state.cropSize) {
+      const activeReg = state.regions.find(r => r.id === state.activeRegionId);
+      if (activeReg) {
+        const handles = getResizeHandles(activeReg);
+        const hs = 8 / state.scale;
+        for (const [key, h] of Object.entries(handles)) {
+          if (Math.abs(pt.x - h.x) < hs && Math.abs(pt.y - h.y) < hs) {
+            state.resizingRegion = { id: activeReg.id, handle: key, startPt: pt, startRect: { ...activeReg } };
+            state.dragging = true;
+            return;
+          }
+        }
+      }
 
-    // Check if clicking inside an existing region to move it
-    const hitRegion = findRegionAt(pt);
-    if (hitRegion) {
-      state.activeRegionId = hitRegion.id;
-      state.movingRegion = { id: hitRegion.id, startPt: pt, startRect: { x: hitRegion.x, y: hitRegion.y } };
+      const hitRegion = findRegionAt(pt);
+      if (hitRegion) {
+        state.activeRegionId = hitRegion.id;
+        state.movingRegion = { id: hitRegion.id, startPt: pt, startRect: { x: hitRegion.x, y: hitRegion.y } };
+        state.dragging = true;
+        renderSidebar();
+        draw();
+        return;
+      }
+
+      // Stamp a new region at click point
+      const cs = state.cropSize;
+      const region = createRegion({
+        x: pt.x - cs.w / 2,
+        y: pt.y - cs.h / 2,
+        w: cs.w,
+        h: cs.h,
+      });
+      // Allow immediate dragging of the new stamp
+      state.movingRegion = { id: region.id, startPt: pt, startRect: { x: region.x, y: region.y } };
       state.dragging = true;
       renderSidebar();
       draw();
       return;
     }
 
-    // Start new selection
+    // No crop size set yet — start defining it by dragging
     state.activeRegionId = null;
     state.dragging = true;
     state.dragStart = { x: pt.x, y: pt.y, cx: pt.x, cy: pt.y };
-    renderSidebar();
     draw();
   });
 
@@ -161,32 +193,55 @@ export function initInput() {
 
     const pt = screenToImage(e.clientX, e.clientY);
 
-    if (state.dragging && state.resizing) {
-      const r = state.regions.find((rg) => rg.id === state.resizing.id);
-      if (!r) return;
-      const sr = state.resizing.startRect;
-      const dx = pt.x - state.resizing.startPt.x;
-      const dy = pt.y - state.resizing.startPt.y;
-      const edge = state.resizing.handle;
-
-      if (edge.includes('l')) { r.x = sr.x + dx; r.w = sr.w - dx; }
-      if (edge.includes('r')) { r.w = sr.w + dx; }
-      if (edge.includes('t')) { r.y = sr.y + dy; r.h = sr.h - dy; }
-      if (edge.includes('b')) { r.h = sr.h + dy; }
-
-      if (r.w < 0) { r.x += r.w; r.w = -r.w; }
-      if (r.h < 0) { r.y += r.h; r.h = -r.h; }
-
-      draw();
-      renderSidebar();
-      return;
-    }
-
     if (state.dragging && state.movingRegion) {
       const r = state.regions.find((rg) => rg.id === state.movingRegion.id);
       if (!r) return;
       r.x = state.movingRegion.startRect.x + (pt.x - state.movingRegion.startPt.x);
       r.y = state.movingRegion.startRect.y + (pt.y - state.movingRegion.startPt.y);
+      draw();
+      renderSidebar();
+      return;
+    }
+
+    if (state.dragging && state.resizingRegion) {
+      const r = state.regions.find((rg) => rg.id === state.resizingRegion.id);
+      if (!r) return;
+      const dx = pt.x - state.resizingRegion.startPt.x;
+      const dy = pt.y - state.resizingRegion.startPt.y;
+      const sr = state.resizingRegion.startRect;
+
+      if (state.resizingRegion.handle === 'nw') {
+        r.x = sr.x + dx;
+        r.y = sr.y + dy;
+        r.w = sr.w - dx;
+        r.h = sr.h - dy;
+      } else if (state.resizingRegion.handle === 'ne') {
+        r.y = sr.y + dy;
+        r.w = sr.w + dx;
+        r.h = sr.h - dy;
+      } else if (state.resizingRegion.handle === 'sw') {
+        r.x = sr.x + dx;
+        r.w = sr.w - dx;
+        r.h = sr.h + dy;
+      } else if (state.resizingRegion.handle === 'se') {
+        r.w = sr.w + dx;
+        r.h = sr.h + dy;
+      }
+
+      // Minimum size check
+      if (r.w < 5) {
+        if (state.resizingRegion.handle.includes('w')) {
+          r.x = sr.x + sr.w - 5;
+        }
+        r.w = 5;
+      }
+      if (r.h < 5) {
+        if (state.resizingRegion.handle.includes('n')) {
+          r.y = sr.y + sr.h - 5;
+        }
+        r.h = 5;
+      }
+
       draw();
       renderSidebar();
       return;
@@ -199,16 +254,37 @@ export function initInput() {
       return;
     }
 
-    // Cursor hints
-    if (state.tool === 'select') {
-      const handleHit = findHandleAt(pt);
-      if (handleHit) {
-        canvas.style.cursor = handleHit.handle.cursor;
-        return;
+    // Stamp preview
+    if (state.cropSize && state.tool === 'select') {
+      state.stampPreview = pt;
+      const activeReg = state.regions.find(r => r.id === state.activeRegionId);
+      if (activeReg) {
+        const handles = getResizeHandles(activeReg);
+        const hs = 8 / state.scale;
+        for (const [key, h] of Object.entries(handles)) {
+          if (Math.abs(pt.x - h.x) < hs && Math.abs(pt.y - h.y) < hs) {
+            canvas.style.cursor = (key === 'nw' || key === 'se') ? 'nwse-resize' : 'nesw-resize';
+            draw();
+            return;
+          }
+        }
       }
+
       const hovered = findRegionAt(pt);
       canvas.style.cursor = hovered ? 'move' : 'crosshair';
+      draw();
+      return;
     }
+
+    // Cursor hints
+    if (state.tool === 'select') {
+      canvas.style.cursor = 'crosshair';
+    }
+  });
+
+  canvas.addEventListener('mouseleave', () => {
+    state.stampPreview = null;
+    draw();
   });
 
   window.addEventListener('mouseup', () => {
@@ -219,22 +295,27 @@ export function initInput() {
       return;
     }
 
-    if (state.dragging && state.dragStart && !state.resizing && !state.movingRegion) {
+    if (state.dragging && state.dragStart && !state.movingRegion) {
       const r = getDragRect();
       if (r.w > MIN_REGION_SIZE && r.h > MIN_REGION_SIZE) {
-        const region = createRegion(r);
+        // Set crop size from this first drag
+        state.cropSize = { w: Math.round(r.w), h: Math.round(r.h) };
+        // Create first region from this drag
+        createRegion({
+          x: r.x,
+          y: r.y,
+          w: state.cropSize.w,
+          h: state.cropSize.h,
+        });
         renderSidebar();
-        setTimeout(() => {
-          const input = document.querySelector(`.region-card[data-id="${region.id}"] .region-name-input`);
-          if (input) input.focus();
-        }, 50);
       }
     }
 
     state.dragging = false;
     state.dragStart = null;
-    state.resizing = null;
     state.movingRegion = null;
+    state.resizingRegion = null;
+    state.resizeHandle = null;
     draw();
   });
 
@@ -248,7 +329,7 @@ export function initInput() {
 
     if (e.key === 's' && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
-      exportCrops();
+      exportGrid();
       return;
     }
 
@@ -270,6 +351,15 @@ export function initInput() {
       renderSidebar();
       draw();
     }
+    // Escape to reset crop size
+    if (e.key === 'Escape') {
+      state.cropSize = null;
+      state.regions = [];
+      state.nextId = 1;
+      state.activeRegionId = null;
+      renderSidebar();
+      draw();
+    }
   });
 
   window.addEventListener('keyup', (e) => {
@@ -281,7 +371,7 @@ export function initInput() {
 
   // ---- Export button ----
 
-  document.getElementById('save-btn').addEventListener('click', exportCrops);
+  document.getElementById('save-btn').addEventListener('click', exportGrid);
 
   // ---- Resize ----
 

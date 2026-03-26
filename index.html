@@ -97,9 +97,30 @@
           <h2>Regions</h2>
           <span id="region-count">0</span>
         </div>
+        
+        <div id="crop-stats" style="padding: 1rem; border-bottom: 1px solid var(--border);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+            <span>Crop Size:</span>
+            <span id="crop-info" style="font-weight: 600;">Not set</span>
+          </div>
+          <button id="reset-crop-btn" class="btn" style="width: 100%; display: none;">Reset Size</button>
+        </div>
+
+        <div id="grid-settings" style="padding: 1rem; border-bottom: 1px solid var(--border); display: none;">
+          <h3 style="margin: 0 0 1rem 0; font-size: 0.9rem;">Grid Preview</h3>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 1rem;">
+            <label style="font-size: 13px;">Cols: <input type="number" id="grid-cols" value="4" min="1" style="width: 100%; padding: 4px; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px;"></label>
+            <label style="font-size: 13px;">Cell W: <input type="number" id="grid-cell-w" value="64" min="1" style="width: 100%; padding: 4px; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px;"></label>
+            <label style="font-size: 13px;">Cell H: <input type="number" id="grid-cell-h" value="64" min="1" style="width: 100%; padding: 4px; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px;"></label>
+          </div>
+          <div style="text-align: center;">
+            <canvas id="grid-preview-canvas" style="max-width: 100%; border: 1px solid var(--border); background: #111; border-radius: 4px;"></canvas>
+          </div>
+        </div>
+
         <div id="region-list"></div>
         <div id="sidebar-empty">
-          <p>Draw rectangles on the image to create crop regions</p>
+          <p>Drag on the image to define crop size</p>
         </div>
       </div>
     </main>

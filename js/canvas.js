@@ -1,6 +1,5 @@
 import { COLORS, FIT_PADDING, ZOOM_MIN, ZOOM_MAX } from './config.js';
 import { state } from './state.js';
-import { getHandles } from './regions.js';
 
 let canvas, ctx, container, zoomLevel;
 
@@ -35,16 +34,31 @@ export function imageToScreen(ix, iy) {
 // ---- View controls ----
 
 export function fitToView() {
-  if (!state.img) return;
+  if (state.images.length === 0) return;
+  
   const cw = container.clientWidth;
   const ch = container.clientHeight;
+  
+  // Calculate bounding box of all images
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  state.images.forEach(imgData => {
+    minX = Math.min(minX, imgData.x);
+    minY = Math.min(minY, imgData.y);
+    maxX = Math.max(maxX, imgData.x + imgData.w);
+    maxY = Math.max(maxY, imgData.y + imgData.h);
+  });
+  
+  const totalW = maxX - minX;
+  const totalH = maxY - minY;
+  
   state.scale = Math.min(
-    (cw - FIT_PADDING) / state.img.width,
-    (ch - FIT_PADDING) / state.img.height,
+    (cw - FIT_PADDING) / totalW,
+    (ch - FIT_PADDING) / totalH,
     1,
   );
-  state.offsetX = (cw - state.img.width * state.scale) / 2;
-  state.offsetY = (ch - state.img.height * state.scale) / 2;
+  
+  state.offsetX = (cw - totalW * state.scale) / 2 - minX * state.scale;
+  state.offsetY = (ch - totalH * state.scale) / 2 - minY * state.scale;
   updateZoomLabel();
 }
 
@@ -76,7 +90,7 @@ export function resizeCanvas() {
   draw();
 }
 
-function getDragRect() {
+export function getDragRect() {
   const ds = state.dragStart;
   const x = Math.min(ds.x, ds.cx);
   const y = Math.min(ds.y, ds.cy);
@@ -85,19 +99,24 @@ function getDragRect() {
   return { x, y, w, h };
 }
 
-export { getDragRect };
-
 export function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  if (!state.img) return;
+  if (state.images.length === 0) return;
 
   ctx.save();
   ctx.translate(state.offsetX, state.offsetY);
   ctx.scale(state.scale, state.scale);
 
-  ctx.drawImage(state.img, 0, 0);
+  // Draw all images
+  state.images.forEach(imgData => {
+    ctx.drawImage(imgData.img, imgData.x, imgData.y);
+  });
 
-  state.regions.forEach((r) => {
+  // Draw existing regions
+  state.regions.forEach((r, idx) => {
+    // Check if region's image is still in state.images
+    if (!state.images.some(imgData => imgData.img === r.img)) return;
+    
     const isActive = r.id === state.activeRegionId;
     ctx.strokeStyle = r.color;
     ctx.lineWidth = (isActive ? 2.5 : 1.5) / state.scale;
@@ -108,10 +127,10 @@ export function draw() {
     ctx.strokeRect(r.x, r.y, r.w, r.h);
     ctx.setLineDash([]);
 
-    // Label
+    // Number label
     const fontSize = Math.max(12, 14 / state.scale);
     ctx.font = `600 ${fontSize}px -apple-system, sans-serif`;
-    const label = r.name || `Region ${r.id}`;
+    const label = `${idx + 1}`;
     const tm = ctx.measureText(label);
     const lx = r.x;
     const ly = r.y - 4 / state.scale;
@@ -121,31 +140,62 @@ export function draw() {
     ctx.fillStyle = '#fff';
     ctx.fillText(label, lx, ly);
 
-    // Resize handles
+    // Resize handles for active region
     if (isActive) {
-      const hs = 6 / state.scale;
-      const handles = getHandles(r, hs);
+      const handles = getResizeHandles(r);
       ctx.fillStyle = '#fff';
       ctx.strokeStyle = r.color;
       ctx.lineWidth = 1.5 / state.scale;
-      handles.forEach((h) => {
-        ctx.fillRect(h.x - hs / 2, h.y - hs / 2, hs, hs);
-        ctx.strokeRect(h.x - hs / 2, h.y - hs / 2, hs, hs);
+      const hs = 8 / state.scale; // Handle size
+      
+      Object.values(handles).forEach(h => {
+        ctx.fillRect(h.x - hs/2, h.y - hs/2, hs, hs);
+        ctx.strokeRect(h.x - hs/2, h.y - hs/2, hs, hs);
       });
     }
   });
 
-  // Drawing preview
-  if (state.dragging && state.dragStart && state.tool === 'select' && !state.resizing && !state.movingRegion) {
+  // Drawing preview (defining crop size)
+  if (state.dragging && state.dragStart && !state.cropSize && !state.movingRegion) {
     const r = getDragRect();
-    ctx.strokeStyle = COLORS[(state.nextId - 1) % COLORS.length];
+    ctx.strokeStyle = '#e94560';
     ctx.lineWidth = 2 / state.scale;
     ctx.setLineDash([6 / state.scale, 3 / state.scale]);
-    ctx.fillStyle = ctx.strokeStyle + '22';
+    ctx.fillStyle = '#e9456022';
     ctx.fillRect(r.x, r.y, r.w, r.h);
     ctx.strokeRect(r.x, r.y, r.w, r.h);
+    ctx.setLineDash([]);
+
+    // Show dimensions
+    const fontSize = Math.max(12, 14 / state.scale);
+    ctx.font = `600 ${fontSize}px -apple-system, sans-serif`;
+    ctx.fillStyle = '#e94560';
+    const dimLabel = `${Math.round(r.w)}\u00d7${Math.round(r.h)}`;
+    ctx.fillText(dimLabel, r.x, r.y + r.h + fontSize + 4 / state.scale);
+  }
+
+  // Stamp preview (crop size is set, hovering)
+  if (state.cropSize && state.stampPreview && !state.dragging) {
+    const cs = state.cropSize;
+    const px = state.stampPreview.x - cs.w / 2;
+    const py = state.stampPreview.y - cs.h / 2;
+    ctx.strokeStyle = '#e9456088';
+    ctx.lineWidth = 1.5 / state.scale;
+    ctx.setLineDash([6 / state.scale, 3 / state.scale]);
+    ctx.fillStyle = '#e9456015';
+    ctx.fillRect(px, py, cs.w, cs.h);
+    ctx.strokeRect(px, py, cs.w, cs.h);
     ctx.setLineDash([]);
   }
 
   ctx.restore();
+}
+
+export function getResizeHandles(r) {
+  return {
+    nw: { x: r.x, y: r.y },
+    ne: { x: r.x + r.w, y: r.y },
+    sw: { x: r.x, y: r.y + r.h },
+    se: { x: r.x + r.w, y: r.y + r.h }
+  };
 }
