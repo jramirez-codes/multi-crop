@@ -179,7 +179,7 @@ export function renderSidebar() {
     dup.addEventListener('click', (ev) => {
       ev.stopPropagation();
       const newRegion = { ...r, id: state.nextId++ };
-      state.regions.splice(idx + 1, 0, newRegion);
+      state.regions.push(newRegion);
       state.activeRegionId = newRegion.id;
       renderSidebar();
       draw();
