@@ -140,8 +140,11 @@ export function draw() {
     ctx.fillStyle = '#fff';
     ctx.fillText(label, lx, ly);
 
-    // Resize handles for active region
+    // Resize handles and crosshair for active region
     if (isActive) {
+      // Crosshair for active region
+      drawCrosshair(ctx, r.x + r.w / 2, r.y + r.h / 2, 20 / state.scale, r.color);
+
       const handles = getResizeHandles(r);
       ctx.fillStyle = '#fff';
       ctx.strokeStyle = r.color;
@@ -186,6 +189,9 @@ export function draw() {
     ctx.fillRect(px, py, cs.w, cs.h);
     ctx.strokeRect(px, py, cs.w, cs.h);
     ctx.setLineDash([]);
+
+    // Crosshair in center
+    drawCrosshair(ctx, state.stampPreview.x, state.stampPreview.y, 20 / state.scale, '#e94560');
   }
 
   ctx.restore();
@@ -198,4 +204,25 @@ export function getResizeHandles(r) {
     sw: { x: r.x, y: r.y + r.h },
     se: { x: r.x + r.w, y: r.y + r.h }
   };
+}
+
+function drawCrosshair(ctx, x, y, size, color) {
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5 / state.scale;
+  ctx.beginPath();
+  // Horizontal line
+  ctx.moveTo(x - size / 2, y);
+  ctx.lineTo(x + size / 2, y);
+  // Vertical line
+  ctx.moveTo(x, y - size / 2);
+  ctx.lineTo(x, y + size / 2);
+  ctx.stroke();
+  
+  // Outer circle for better visibility (optional, but looks premium)
+  ctx.beginPath();
+  ctx.arc(x, y, size / 4, 0, Math.PI * 2);
+  ctx.stroke();
+  
+  ctx.restore();
 }
